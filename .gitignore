@@ -1,0 +1,66 @@
+# Windows image file caches
+Thumbs.db
+ehthumbs.db
+
+# Folder config file
+Desktop.ini
+
+# Recycle Bin used on file shares
+$RECYCLE.BIN/
+
+# Windows Installer files
+*.cab
+*.msi
+*.msm
+*.msp
+
+# Windows shortcuts
+*.lnk
+
+# =========================
+# Operating System Files
+# =========================
+
+# OSX
+# =========================
+
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Thumbnails
+._*
+
+# Files that might appear in the root of a volume
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+
+# Directories potentially created on remote AFP share
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Custom Exclusions for Large Files
+*.zip
+*.avi
+*.mp4
+*.wmv
+*.pth
+*.dat
+*.pkl
+__pycache__/
+*.pyc
+
+# Dataset & Libraries Exclusions
+mrleyedataset/
+dataset_eyes&yawn/
+dataset_nthuddd2/
+dlib-20.0/
+Video Database/
+.vs/

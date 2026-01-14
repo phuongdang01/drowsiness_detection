@@ -1,0 +1,22 @@
+import wave
+import numpy as np
+
+# Thông số âm thanh
+framerate = 44100  # tần số mẫu
+duration = 1.0     # độ dài (giây)
+frequency = 800    # tần số âm (Hz)
+
+t = np.linspace(0, duration, int(framerate * duration))
+data = np.sin(2 * np.pi * frequency * t)
+
+# Chuẩn hóa dữ liệu về 16-bit
+data = (data * 32767).astype(np.int16)
+
+# Ghi file WAV
+with wave.open("alert.wav", "w") as wav_file:
+    wav_file.setnchannels(1)       # mono
+    wav_file.setsampwidth(2)       # 16-bit
+    wav_file.setframerate(framerate)
+    wav_file.writeframes(data.tobytes())
+
+print("✅ File 'alert.wav' đã được tạo thành công!")
