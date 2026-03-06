@@ -51,7 +51,7 @@ def train():
     ])
 
     # Load Data
-    data_dir = 'dataset_eyes&yawn/train'
+    data_dir = 'CEW'
     if not os.path.exists(data_dir):
         print(f"Directory not found: {data_dir}")
         return

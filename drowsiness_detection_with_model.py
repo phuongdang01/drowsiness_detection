@@ -139,7 +139,8 @@ alert_thread = None
 # ====================== MAIN LOOP ======================
 # Use video from Video Database folder
 video_path = r"deokinhthieusang.mp4"
-cap = cv2.VideoCapture(video_path)
+#cap = cv2.VideoCapture(video_path)
+cap = cv2.VideoCapture(0)
 
 if not cap.isOpened():
     print(f"Error: Cannot open video file {video_path}")
