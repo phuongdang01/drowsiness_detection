@@ -379,21 +379,21 @@ def mouth_aspect_ratio(mouth):
     if B == 0: 
         return 0.0
     return A / B
-EAR_THRESH = 0.20       # Giảm nhẹ để tránh nhầm mắt híp là nhắm (Gốc: 0.22)
-EAR_FRAMES = 20         # Tăng thời gian nhắm mắt lên ~0.7s mới báo động (Gốc: 15)
+EAR_THRESH = 0.23
+EAR_FRAMES = 15         # Thời gian nhắm mắt ~0.5s
 MAR_THRESH = 0.6
 YAWN_FRAMES = 20
-YAWN_WINDOW = 60        # Tăng cửa sổ thời gian đếm ngáp (Gốc: 30)
+YAWN_WINDOW = 60        # Cửa sổ thời gian đếm ngáp
 MAX_YAWNS_IN_WINDOW = 3
-HEAD_PITCH_THRESH = 20  # Tăng góc cúi đầu để tránh báo nhầm khi nhìn bảng điều khiển (Gốc: 15)
+HEAD_PITCH_THRESH = 20  # Góc cúi đầu
 HEAD_YAW_THRESH = 30
-HEAD_NOD_FRAMES = 30    # Tăng số frame xác nhận gật gù (Gốc: 20)
-CONFIDENCE_THRESH = 0.75 # Tăng độ tin cậy mô hình yêu cầu (Gốc: 0.65)
+HEAD_NOD_FRAMES = 30    # Số frame xác nhận gật gù
+CONFIDENCE_THRESH = 0.75 # Độ tin cậy mô hình yêu cầu
 DEBUG_MODE = True
-GAZE_FIXATION_TIME = 6.0  # Tăng thời gian nhìn chằm chằm lên 6s (Gốc: 3.0)
-GAZE_MOVE_THRESH = 1.5    # Giảm pixel, mắt phải cực kỳ đứng yên mới tính (Gốc: 3.0)
-BLINK_FREQ_THRESH = 8     # Tăng ngưỡng chớp mắt (Gốc: 5)
-BLINK_WINDOW = 10.0       # Tăng cửa sổ đo chớp mắt (Gốc: 5.0)
+GAZE_FIXATION_TIME = 6.0  # Thời gian nhìn chằm chằm 6s
+GAZE_MOVE_THRESH = 1.5    # Pixel, mắt phải cực kỳ đứng yên mới tính
+BLINK_FREQ_THRESH = 10     # Ngưỡng chớp mắt
+BLINK_WINDOW = 10.0       # Cửa sổ đo chớp mắt
 def play_alert_loop(stop_event):
     """Play alert sound in loop"""
     while not stop_event.is_set():
@@ -402,6 +402,16 @@ def play_alert_loop(stop_event):
         except:
             print("Alert sound not found!")
             time.sleep(0.5)
+
+def play_double_alert():
+    """Play alert sound twice"""
+    try:
+        playsound("alert.wav")
+        time.sleep(0.2)
+        playsound("alert.wav")
+    except:
+        print("Alert sound not found!")
+
 # ====================== STATE VARIABLES ======================
 eye_counter = 0
 yawn_counter = 0
@@ -434,6 +444,9 @@ stare_start_time = None
 yawn_timestamps = deque(maxlen=100)  # Store timestamps of yawns
 current_yawn_frames = 0
 is_yawning = False
+yawn_warning_active = False # Track if yawn warning has been fired for current sequence
+blink_warning_active = False
+gaze_warning_active = False
 
 # ====================== VIDEO SOURCE ======================
 # Change these settings based on your needs
@@ -590,10 +603,15 @@ while True:
         blink_freq = len(recent_blinks)
         
         if blink_freq > BLINK_FREQ_THRESH:
-            # Chỉ coi là dấu hiệu phụ, không báo động ngay lập tức
-            # is_drowsy = True
-            # drowsy_reasons.append(f"BLINKING ({blink_freq})")
-            pass
+            is_drowsy = True
+            drowsy_reasons.append(f"RAPID BLINKING ({blink_freq})")
+            
+            # Play double alert for blinking
+            if not blink_warning_active:
+                threading.Thread(target=play_double_alert, daemon=True).start()
+                blink_warning_active = True
+        else:
+            blink_warning_active = False
             
         # --- GAZE TRACKING (BLANK STARE) ---
         # ... (giữ nguyên logic tính toán) ...
@@ -645,10 +663,16 @@ while True:
                             cv2.putText(frame, "STARE DETECTED", (w - 250, h - 130), 
                                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
                         else:
-                            # Chỉ cảnh báo nhẹ
+                            # Cảnh báo nhẹ cho Fixed Gaze (Tunnel Vision)
+                            is_drowsy = True
                             drowsy_reasons.append("FIXED GAZE")
+                            
+                            if not gaze_warning_active:
+                                threading.Thread(target=play_double_alert, daemon=True).start()
+                                gaze_warning_active = True
                 else:
                     stare_start_time = None
+                    gaze_warning_active = False
             
             # Draw pupil/iris centers
             cv2.circle(frame, tuple(l_center), 3, (0, 255, 255), -1)
@@ -707,6 +731,13 @@ while True:
         if yawn_frequency >= MAX_YAWNS_IN_WINDOW:
             is_drowsy = True
             drowsy_reasons.append(f"FREQUENT YAWNING ({yawn_frequency}x)")
+            
+            # Play double alert for yawning (2 hồi)
+            if not yawn_warning_active:
+                threading.Thread(target=play_double_alert, daemon=True).start()
+                yawn_warning_active = True
+        else:
+            yawn_warning_active = False
         
         # Draw mouth box
         mouth_rect = cv2.boundingRect(np.array(mouth_pts))
@@ -721,10 +752,21 @@ while True:
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
         cv2.putText(frame, f"Yawn Freq: {yawn_frequency}/{MAX_YAWNS_IN_WINDOW}", (10, 80), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        cv2.putText(frame, f"Blink Freq: {blink_freq}/{BLINK_FREQ_THRESH}", (10, 105), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        
+        # Display Gaze info if available
+        gaze_text = "Gaze: N/A"
+        try:
+           if 'movement_score' in locals():
+               gaze_text = f"Gaze Move: {movement_score:.2f}"
+        except: pass
+        cv2.putText(frame, gaze_text, (10, 130), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
         cv2.putText(frame, f"L-Eye: {'CLOSED' if left_eye_pred == 0 else 'OPEN'} ({left_eye_conf:.2f})", 
-                   (10, 105), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                   (10, 155), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
         cv2.putText(frame, f"R-Eye: {'CLOSED' if right_eye_pred == 0 else 'OPEN'} ({right_eye_conf:.2f})", 
-                   (10, 125), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                   (10, 175), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
     
     # ========== DROWSINESS ALERT ==========
     if is_drowsy:
@@ -732,12 +774,23 @@ while True:
         cv2.putText(frame, status_text, (10, h - 50), 
                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 3)
         
-        # Start alert sound
-        if alert_thread is None or not alert_thread.is_alive():
-            stop_event.clear()
-            alert_thread = threading.Thread(target=play_alert_loop, args=(stop_event,))
-            alert_thread.daemon = True
-            alert_thread.start()
+        # Start alert sound ONLY if we have continuous reasons (Eyes, Head, Stare)
+        # Filter out Warning-type triggers (YAWNING, BLINKING, FIXED GAZE) from triggers for the continuous loop
+        # "BLANK STARE" is considered critical (continuous), "FIXED GAZE" is warning (double beep)
+        warning_keywords = ["YAWNING", "BLINKING", "FIXED GAZE"]
+        continuous_triggers = [r for r in drowsy_reasons if not any(w in r for w in warning_keywords)]
+        
+        if len(continuous_triggers) > 0:
+            if alert_thread is None or not alert_thread.is_alive():
+                stop_event.clear()
+                alert_thread = threading.Thread(target=play_alert_loop, args=(stop_event,))
+                alert_thread.daemon = True
+                alert_thread.start()
+        else:
+            # If only yawning, stop the loop if it was running (e.g. transition from closed eyes to just yawning)
+            if alert_thread and alert_thread.is_alive():
+                stop_event.set()
+                
     else:
         cv2.putText(frame, "Status: ALERT", (10, h - 50), 
                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3)
